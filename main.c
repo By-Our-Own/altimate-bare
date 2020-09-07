@@ -49,24 +49,31 @@ static void h_button_event(void);
 int main(void)
 {
     uint8_t curr_delay = 0U;
+    uint32_t initial;
 
     /* Initialize system */
-	board_init();
-	led_init();
-	button_init();
+    board_init();
+    led_init();
+    button_init();
     ioint_configure(B1_PORT, B1_PIN, IOINT_TRIG_FALLING, 0, h_button_event);
     ioint_enable(B1_PORT, B1_PIN);
 
-	/* Infinite loop */
-	while (1) {
-		if (button_down) {
+    initial = millis();
+
+    /* Infinite loop */
+    while (1) {
+        if (button_down) {
+            /* Get next delay */
             curr_delay = (curr_delay + 1) % ARRAY_SIZE(delays);
             button_down = 0U;
         }
 
-        led_blink();
-        delay_ms(delays[curr_delay]);
-	}
+        /* If enough time has passed, blink */
+        if (millis() - initial >= delays[curr_delay]) {
+            led_blink();
+            initial = millis();
+        }
+    }
 }
 
 void h_button_event(void)
