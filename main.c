@@ -23,6 +23,8 @@
 #include "button.h"
 #include "iointerrupt.h"
 #include "utils.h"
+#include "console.h"
+#include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
 
@@ -36,9 +38,13 @@
 /* Private variables ---------------------------------------------------------*/
 static volatile uint8_t button_down = 0U;
 static uint16_t delays[] = { 2000U, 1000U, 500U, 100U };
+static char message[] = "System initilized at ";
+static char num[11];
 
 /* Private function prototypes -----------------------------------------------*/
 static void h_button_event(void);
+static unsigned count_digits(int num);
+static char *itoa(char dst[], int num);
 
 /* Private user code ---------------------------------------------------------*/
 
@@ -57,6 +63,11 @@ int main(void)
     button_init();
     ioint_configure(B1_PORT, B1_PIN, IOINT_TRIG_FALLING, 0, h_button_event);
     ioint_enable(B1_PORT, B1_PIN);
+
+    /* Print welcome message */
+    console_write(message, strlen(message));
+    console_write(itoa(num, millis()), strlen(num));
+    console_write(" ms\n\r", 5);
 
     initial = millis();
 
@@ -79,6 +90,42 @@ int main(void)
 void h_button_event(void)
 {
     button_down = 1U;
+}
+
+unsigned count_digits(int num)
+{
+    unsigned num_digits = 0;
+
+    do {
+        num_digits++;
+    } while (num /= 10);
+
+    return num_digits;
+}
+
+char *itoa(char dst[], int num)
+{
+    int i;
+    int sign;
+    unsigned num_digits = 0;
+
+    if ((sign = num) < 0) {
+        num = -num;
+        num_digits = 1; /* for the sign */
+    }
+    num_digits += count_digits(num);
+
+    i = num_digits;
+    do {
+        dst[--i] = '0' + num % 10;
+    } while(num /= 10);
+
+    if (sign < 0) {
+        dst[0] = '-';
+    }
+    dst[num_digits] = '\0';
+
+    return dst;
 }
 
 /**
