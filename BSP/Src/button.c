@@ -1,14 +1,11 @@
 #include "button.h"
-#include "gpio.h"
 
-void button_init(void)
+void button_init(const struct iohandle *iohandle)
 {
-    /* Configure IO */
-    LL_GPIO_SetPinPull(B1_GPIO_Port, B1_Pin, LL_GPIO_PULL_UP);
-    LL_GPIO_SetPinMode(B1_GPIO_Port, B1_Pin, LL_GPIO_MODE_INPUT);
+    iohandle->config(iohandle);
 }
 
-uint8_t button_pressed(void)
+uint32_t button_pressed(const struct iohandle *iohandle)
 {
-    return !LL_GPIO_IsInputPinSet(B1_GPIO_Port, B1_Pin);
+    return !iohandle->get(iohandle);
 }

@@ -2,8 +2,9 @@
 #define _BSP_BUTTON_H
 
 #include <stdint.h>
+#include "iohandle.h"
 
-void button_init(void);
-uint8_t button_pressed(void);
+void button_init(const struct iohandle *iohandle);
+uint32_t button_pressed(const struct iohandle *iohandle);
 
 #endif /* _BSP_BUTTON_H */

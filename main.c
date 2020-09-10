@@ -22,6 +22,7 @@
 #include "led.h"
 #include "button.h"
 #include "iointerrupt.h"
+#include "iohandle.h"
 #include "utils.h"
 #include "console.h"
 #include <string.h>
@@ -41,7 +42,13 @@ static uint16_t delays[] = { 2000U, 1000U, 500U, 100U };
 static char message[] = "System initilized at ";
 static char num[11];
 
+static struct app_data {
+    struct iohandle user_led_2;
+    struct iohandle user_button_1;
+} app_data;
+
 /* Private function prototypes -----------------------------------------------*/
+static void app_init(struct app_data *app_data);
 static void h_button_event(void);
 static unsigned count_digits(int num);
 static char *itoa(char dst[], int num);
@@ -55,21 +62,16 @@ static char *itoa(char dst[], int num);
 int main(void)
 {
     uint8_t curr_delay = 0U;
-    uint32_t initial;
+    uint32_t initial_ts;
 
-    /* Initialize system */
-    board_init();
-    led_init();
-    button_init();
-    ioint_configure(B1_PORT, B1_PIN, IOINT_TRIG_FALLING, 0, h_button_event);
-    ioint_enable(B1_PORT, B1_PIN);
+    app_init(&app_data);
 
     /* Print welcome message */
     console_write(message, strlen(message));
     console_write(itoa(num, millis()), strlen(num));
     console_write(" ms\n\r", 5);
 
-    initial = millis();
+    initial_ts = millis();
 
     /* Infinite loop */
     while (1) {
@@ -80,19 +82,38 @@ int main(void)
         }
 
         /* If enough time has passed, blink */
-        if (millis() - initial >= delays[curr_delay]) {
-            led_blink();
-            initial = millis();
+        if (millis() - initial_ts >= delays[curr_delay]) {
+            led_blink(&app_data.user_led_2);
+            initial_ts = millis();
         }
     }
 }
 
-void h_button_event(void)
+static void app_init(struct app_data *app_data)
+{
+    /* Initialize system */
+    board_init();
+
+    /* Initialize on board LED */
+    iohandle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, GPIO_OUTPUT);
+    led_init(&app_data->user_led_2);
+
+    /* Initialize on board button */
+    iohandle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, GPIO_INPUT);
+    button_init(&app_data->user_button_1);
+
+    /* Configure on board button with an interrupt */
+    ioint_configure(B1_PORT, B1_PIN, IOINT_TRIG_FALLING, 0, h_button_event);
+    ioint_enable(B1_PORT, B1_PIN);
+
+}
+
+static void h_button_event(void)
 {
     button_down = 1U;
 }
 
-unsigned count_digits(int num)
+static unsigned count_digits(int num)
 {
     unsigned num_digits = 0;
 
@@ -103,7 +124,7 @@ unsigned count_digits(int num)
     return num_digits;
 }
 
-char *itoa(char dst[], int num)
+static char *itoa(char dst[], int num)
 {
     int i;
     int sign;
