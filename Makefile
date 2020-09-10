@@ -53,6 +53,7 @@ BSP/Src/led.c \
 BSP/Src/button.c \
 BSP/Src/utils.c \
 BSP/Src/console.c \
+BSP/Src/iohandle.c \
 BSP/Src/iointerrupt.c
 
 # ASM sources
