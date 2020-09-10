@@ -37,8 +37,9 @@
 #define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
 
 /* Private variables ---------------------------------------------------------*/
-static volatile uint8_t button_down = 0U;
-static uint16_t delays[] = { 2000U, 1000U, 500U, 100U };
+const static uint8_t button_response_time = 40U; /* Should be in (10, 50] msec */
+const static uint8_t button_filter_times = 8U;
+static uint16_t blink_periods[] = { 2000U, 1000U, 500U, 100U };
 static char message[] = "System initilized at ";
 static char num[11];
 
@@ -49,7 +50,6 @@ static struct app_data {
 
 /* Private function prototypes -----------------------------------------------*/
 static void app_init(struct app_data *app_data);
-static void h_button_event(void);
 static unsigned count_digits(int num);
 static char *itoa(char dst[], int num);
 
@@ -61,30 +61,64 @@ static char *itoa(char dst[], int num);
  */
 int main(void)
 {
-    uint8_t curr_delay = 0U;
-    uint32_t initial_ts;
+    uint8_t i;
+    uint16_t blink_period;
+    uint32_t now;
+    uint32_t start_blink;
+    uint32_t start_debouncing;
+    uint8_t button_down;
+    uint8_t last_button;
+    uint8_t button_flag;
+    uint8_t debounce_period;
 
     app_init(&app_data);
+    now = millis();
 
     /* Print welcome message */
     console_write(message, strlen(message));
-    console_write(itoa(num, millis()), strlen(num));
+    console_write(itoa(num, now), strlen(num));
     console_write(" ms\n\r", 5);
 
-    initial_ts = millis();
+    /* Initialize flags and states */
+    debounce_period = button_response_time / button_filter_times;
+
+    button_down = 0U;
+    last_button = 0U;
+    button_flag = 0U;
+
+    i = 0U;
+    blink_period = blink_periods[i];
+
+    start_debouncing = millis();
+    start_blink = millis();
 
     /* Infinite loop */
     while (1) {
-        if (button_down) {
-            /* Get next delay */
-            curr_delay = (curr_delay + 1) % ARRAY_SIZE(delays);
-            button_down = 0U;
+        /* If enough time has passed, blink */
+        now = millis();
+        if (now - start_debouncing >= debounce_period) {
+            start_debouncing = now;
+
+            /* Get filtered button output and update states and flags */
+            button_down = button_filter(&app_data.user_button_1);
+            button_flag = button_down && !last_button;
+            last_button = button_down;
+
+            /* If button is pressed, get next delay */
+            if (button_flag) {
+                button_flag = 0U;
+                blink_period = blink_periods[++i % ARRAY_SIZE(blink_periods)];
+                console_write("Button pressed\n\r", 16);
+            }
         }
 
         /* If enough time has passed, blink */
-        if (millis() - initial_ts >= delays[curr_delay]) {
+        now = millis();
+        if (now - start_blink >= blink_period) {
+            start_blink = now;
+
             led_blink(&app_data.user_led_2);
-            initial_ts = millis();
+            console_write("LED blink\n\r", 11);
         }
     }
 }
@@ -95,22 +129,14 @@ static void app_init(struct app_data *app_data)
     board_init();
 
     /* Initialize on board LED */
-    iohandle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, GPIO_OUTPUT);
+    iohandle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, GPIO_OUTPUT,
+                  0U, 0U);
     led_init(&app_data->user_led_2);
 
     /* Initialize on board button */
-    iohandle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, GPIO_INPUT);
+    iohandle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, GPIO_INPUT,
+                  1U, button_filter_times);
     button_init(&app_data->user_button_1);
-
-    /* Configure on board button with an interrupt */
-    ioint_configure(B1_PORT, B1_PIN, IOINT_TRIG_FALLING, 0, h_button_event);
-    ioint_enable(B1_PORT, B1_PIN);
-
-}
-
-static void h_button_event(void)
-{
-    button_down = 1U;
 }
 
 static unsigned count_digits(int num)
