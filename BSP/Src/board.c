@@ -2,6 +2,7 @@
 #include "main.h"
 #include "usart.h"
 #include "gpio.h"
+#include "tim.h"
 
 static void SystemClock_Config(void);
 
@@ -22,6 +23,7 @@ void board_init(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
+  MX_TIM_Init();
 }
 
 /**

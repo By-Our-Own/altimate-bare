@@ -38,9 +38,11 @@ BUILD_DIR = build
 C_SOURCES =  \
 main.c \
 Core/Src/gpio.c \
+Core/Src/tim.c \
 Core/Src/usart.c \
 Core/Src/stm32l0xx_it.c \
 Drivers/STM32L0xx_HAL_Driver/Src/stm32l0xx_ll_gpio.c \
+Drivers/STM32L0xx_HAL_Driver/Src/stm32l0xx_ll_tim.c \
 Drivers/STM32L0xx_HAL_Driver/Src/stm32l0xx_ll_pwr.c \
 Drivers/STM32L0xx_HAL_Driver/Src/stm32l0xx_ll_exti.c \
 Drivers/STM32L0xx_HAL_Driver/Src/stm32l0xx_ll_usart.c \
@@ -54,6 +56,7 @@ BSP/Src/button.c \
 BSP/Src/utils.c \
 BSP/Src/console.c \
 BSP/Src/iohandle.c \
+BSP/Src/timer.c \
 BSP/Src/iointerrupt.c
 
 # ASM sources
