@@ -25,6 +25,7 @@
 #include "iohandle.h"
 #include "utils.h"
 #include "console.h"
+#include "timer.h"
 #include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
@@ -39,19 +40,32 @@
 /* Private variables ---------------------------------------------------------*/
 const static uint8_t button_response_time = 40U; /* Should be in (10, 50] msec */
 const static uint8_t button_filter_times = 8U;
-static uint16_t blink_periods[] = { 2000U, 1000U, 500U, 100U };
+
+/* For the LED frequencies */
+static struct tim_settings {
+    uint32_t frequency;
+    uint32_t autorelod;
+} tim_led_settings[3] = {
+    {13000U, 2000U},    /* 6.5Hz */
+    {17000U, 2000U},    /* 8.5Hz */
+    {20000U, 2000U},    /* 10Hz */
+};
+
 static char message[] = "System initilized at ";
 static char num[11];
 
 static struct app_data {
     struct iohandle user_led_2;
     struct iohandle user_button_1;
+
+    volatile uint8_t led_idx;
 } app_data;
 
 /* Private function prototypes -----------------------------------------------*/
 static void app_init(struct app_data *app_data);
 static unsigned count_digits(int num);
 static char *itoa(char dst[], int num);
+static void h_timer_expired(void);
 
 /* Private user code ---------------------------------------------------------*/
 
@@ -61,10 +75,7 @@ static char *itoa(char dst[], int num);
  */
 int main(void)
 {
-    uint8_t i;
-    uint16_t blink_period;
     uint32_t now;
-    uint32_t start_blink;
     uint32_t start_debouncing;
     uint8_t button_down;
     uint8_t last_button;
@@ -86,11 +97,7 @@ int main(void)
     last_button = 0U;
     button_flag = 0U;
 
-    i = 0U;
-    blink_period = blink_periods[i];
-
     start_debouncing = millis();
-    start_blink = millis();
 
     /* Infinite loop */
     while (1) {
@@ -106,19 +113,15 @@ int main(void)
 
             /* If button is pressed, get next delay */
             if (button_flag) {
+                /* Get next led blinking frequency*/
+                app_data.led_idx = (app_data.led_idx + 1) % ARRAY_SIZE(tim_led_settings);
+                timer_configure(tim_led_settings[app_data.led_idx].frequency,
+                                tim_led_settings[app_data.led_idx].autorelod,
+                                h_timer_expired);
+
                 button_flag = 0U;
-                blink_period = blink_periods[++i % ARRAY_SIZE(blink_periods)];
                 console_write("Button pressed\n\r", 16);
             }
-        }
-
-        /* If enough time has passed, blink */
-        now = millis();
-        if (now - start_blink >= blink_period) {
-            start_blink = now;
-
-            led_blink(&app_data.user_led_2);
-            console_write("LED blink\n\r", 11);
         }
     }
 }
@@ -128,15 +131,29 @@ static void app_init(struct app_data *app_data)
     /* Initialize system */
     board_init();
 
+    app_data->led_idx = 0U;
+
     /* Initialize on board LED */
     iohandle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, GPIO_OUTPUT,
                   0U, 0U);
     led_init(&app_data->user_led_2);
+    led_off(&app_data->user_led_2);
 
     /* Initialize on board button */
     iohandle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, GPIO_INPUT,
                   1U, button_filter_times);
     button_init(&app_data->user_button_1);
+
+    /* Initialize timer for generation of the LED blinking frequencies */
+    timer_configure(tim_led_settings[app_data->led_idx].frequency,
+                    tim_led_settings[app_data->led_idx].autorelod,
+                    h_timer_expired);
+    timer_start();
+}
+
+static void h_timer_expired(void)
+{
+    led_blink(&app_data.user_led_2);
 }
 
 static unsigned count_digits(int num)
