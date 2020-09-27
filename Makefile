@@ -57,7 +57,8 @@ BSP/Src/utils.c \
 BSP/Src/console.c \
 BSP/Src/iohandle.c \
 BSP/Src/timer.c \
-BSP/Src/iointerrupt.c
+BSP/Src/iointerrupt.c \
+Devices/Src/lcd.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -127,6 +128,7 @@ AS_INCLUDES =
 C_INCLUDES =  \
 -ICore/Inc \
 -IBSP/Inc \
+-IDevices/Inc \
 -IDrivers/STM32L0xx_HAL_Driver/Inc \
 -IDrivers/CMSIS/Device/ST/STM32L0xx/Include \
 -IDrivers/CMSIS/Include \

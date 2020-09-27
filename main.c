@@ -26,6 +26,7 @@
 #include "utils.h"
 #include "console.h"
 #include "timer.h"
+#include "lcd.h"
 #include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
@@ -57,6 +58,7 @@ static char num[11];
 static struct app_data {
     struct iohandle user_led_2;
     struct iohandle user_button_1;
+    struct iohandle lcd_conn[8];
 
     volatile uint8_t led_idx;
 } app_data;
@@ -131,11 +133,30 @@ static void app_init(struct app_data *app_data)
     /* Initialize system */
     board_init();
 
+    /* Initialize LCD */
+    iohandle_init(&app_data->lcd_conn[LCD_E], GPIOC, LL_GPIO_PIN_7, GPIO_OUTPUT, 0, 0);
+    iohandle_init(&app_data->lcd_conn[LCD_RS], GPIOA, LL_GPIO_PIN_9, GPIO_OUTPUT, 0, 0);
+    iohandle_init(&app_data->lcd_conn[LCD_RW], GPIOA, LL_GPIO_PIN_8, GPIO_OUTPUT, 0, 0);
+    iohandle_init(&app_data->lcd_conn[LCD_DB4], GPIOB, LL_GPIO_PIN_10, GPIO_OUTPUT, 0, 0);
+    iohandle_init(&app_data->lcd_conn[LCD_DB5], GPIOB, LL_GPIO_PIN_4, GPIO_OUTPUT, 0, 0);
+    iohandle_init(&app_data->lcd_conn[LCD_DB6], GPIOB, LL_GPIO_PIN_5, GPIO_OUTPUT, 0, 0);
+    iohandle_init(&app_data->lcd_conn[LCD_DB7], GPIOB, LL_GPIO_PIN_3, GPIO_OUTPUT, 0, 0);
+    iohandle_init(&app_data->lcd_conn[LCD_BL], GPIOB, LL_GPIO_PIN_6, GPIO_OUTPUT, 0, 0);
+
+    lcd_init(&app_data->lcd_conn);
+    lcd_backlight(1);
+    lcd_display(0, 0, "How you doin?!");
+    delay_ms(2000);
+    // lcd_clear();
+    lcd_display(3, 1, "Mmmm?");
+
     app_data->led_idx = 0U;
 
     /* Initialize on board LED */
     iohandle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, GPIO_OUTPUT,
                   0U, 0U);
+    // iohandle_init(&app_data->user_led_2, GPIOA, LL_GPIO_PIN_15, GPIO_OUTPUT,
+    //               0U, 0U);
     led_init(&app_data->user_led_2);
     led_off(&app_data->user_led_2);
 
