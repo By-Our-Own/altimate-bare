@@ -2,7 +2,7 @@
 #define _SCHEDULER_DEADLINE_H
 
 #include <stdint.h>
-#include "utils.h"
+#include "delay.h"
 
 /**
  * @brief Checks if a deadline has been reached

@@ -53,12 +53,13 @@ Core/Src/system_stm32l0xx.c \
 BSP/Src/board.c \
 BSP/Src/led.c \
 BSP/Src/button.c \
-BSP/Src/utils.c \
 BSP/Src/console.c \
 BSP/Src/iohandle.c \
 BSP/Src/timer.c \
 BSP/Src/iointerrupt.c \
-Devices/Src/lcd.c
+Devices/Src/lcd.c \
+Misc/Src/delay.c \
+Misc/Src/utils.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -130,6 +131,7 @@ C_INCLUDES =  \
 -IBSP/Inc \
 -IDevices/Inc \
 -IScheduler/Inc \
+-IMisc/Inc \
 -IDrivers/STM32L0xx_HAL_Driver/Inc \
 -IDrivers/CMSIS/Device/ST/STM32L0xx/Include \
 -IDrivers/CMSIS/Include

@@ -1,5 +1,5 @@
-#ifndef _BSP_UTILS_H
-#define _BSP_UTILS_H
+#ifndef _MISC_DELAY_H
+#define _MISC_DELAY_H
 
 #include <stdint.h>
 
@@ -20,4 +20,4 @@ void delay_ms(uint32_t ms);
  */
 uint32_t millis(void);
 
-#endif /* _BSP_UTILS_H */
+#endif /* _MISC_DELAY_H */

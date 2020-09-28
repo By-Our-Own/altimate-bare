@@ -23,11 +23,12 @@
 #include "button.h"
 #include "iointerrupt.h"
 #include "iohandle.h"
-#include "utils.h"
 #include "console.h"
 #include "timer.h"
 #include "lcd.h"
 #include "deadline.h"
+#include "delay.h"
+#include "utils.h"
 #include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
@@ -52,7 +53,7 @@ static struct tim_settings {
 };
 
 static char message[] = "System initilized at ";
-static char num[11];
+static char num_buf[11];
 
 static struct app_data {
     struct iohandle user_led_2;
@@ -70,8 +71,6 @@ static struct app_data {
 
 /* Private function prototypes -----------------------------------------------*/
 static void app_init(struct app_data *app_data);
-static unsigned count_digits(int num);
-static char *itoa(char dst[], int num);
 static void h_timer_expired(void);
 
 /* Private user code ---------------------------------------------------------*/
@@ -82,7 +81,6 @@ static void h_timer_expired(void);
  */
 int main(void)
 {
-    uint32_t now;
     uint8_t button_down;
     uint8_t last_button;
     uint8_t button_flag;
@@ -91,15 +89,11 @@ int main(void)
     uint16_t c100ms;
 
     app_init(&app_data);
-    now = millis();
 
     /* Print welcome message */
     console_write(message, strlen(message));
-    console_write(itoa(num, now), strlen(num));
+    console_write(misc_itoa(num_buf, millis()), strlen(num_buf));
     console_write(" ms\n\r", 5);
-
-    c1000ms = 0U;
-    c100ms = 0U;
 
     /* Initialize flags and states */
     debounce_period = button_debounce_time_ms(&app_data.user_button_1);
@@ -108,15 +102,18 @@ int main(void)
     last_button = 0U;
     button_flag = 0U;
 
+    c1000ms = 0U;
+    c100ms = 0U;
+
     /* Infinite loop */
     while (1) {
         /* Handle 1000ms counter */
         if (deadline_reached(app_data.c1000ms_dl)) {
             c1000ms++;
-            app_data.c1000ms_dl = deadline_extend(app_data.c1000ms_dl, 1000);
             if (!(c1000ms % 1000)) {
                 app_data.lcd_flag = 1;  /* Display smooth 1 second changes */
             }
+            app_data.c1000ms_dl = deadline_extend(app_data.c1000ms_dl, 1000);
         }
 
         /* Handle 100ms counter */
@@ -141,7 +138,6 @@ int main(void)
                                 h_timer_expired);
 
                 button_flag = 0U;
-                // console_write("Button pressed\n\r", 16);
             }
 
             app_data.button_dl = deadline_extend(app_data.button_dl, debounce_period);
@@ -149,8 +145,8 @@ int main(void)
 
         /* Handle LCD refresh */
         if (app_data.lcd_flag || deadline_reached(app_data.lcd_dl)) {
-            lcd_display(9, 0, itoa(num, c1000ms));
-            lcd_display(9, 1, itoa(num, c100ms));
+            lcd_display(9, 0, misc_itoa(num_buf, c1000ms));
+            lcd_display(9, 1, misc_itoa(num_buf, c100ms));
 
             if (app_data.lcd_flag) {
                 app_data.lcd_flag = 0;
@@ -176,10 +172,13 @@ static void app_init(struct app_data *app_data)
     iohandle_init(&app_data->lcd_conn[LCD_DB6], GPIOB, LL_GPIO_PIN_5, GPIO_OUTPUT);
     iohandle_init(&app_data->lcd_conn[LCD_DB7], GPIOB, LL_GPIO_PIN_3, GPIO_OUTPUT);
     iohandle_init(&app_data->lcd_conn[LCD_BL], GPIOB, LL_GPIO_PIN_6, GPIO_OUTPUT);
-
     lcd_init(&app_data->lcd_conn);
 
-    app_data->led_idx = 0U;
+    /* Initialize UI */
+    lcd_backlight(1);
+    lcd_display(0, 0, "C1000ms:");
+    lcd_display(0, 1, "C 100ms:");
+
 
     /* Initialize on board LED */
     iohandle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, GPIO_OUTPUT);
@@ -192,15 +191,12 @@ static void app_init(struct app_data *app_data)
     button_init(&app_data->user_button_1, 5U);
 
     /* Initialize timer for generation of the LED blinking frequencies */
+    app_data->led_idx = 0U;
+
     timer_configure(tim_led_settings[app_data->led_idx].frequency,
                     tim_led_settings[app_data->led_idx].autorelod,
                     h_timer_expired);
     timer_start();
-
-    /* Initialize UI */
-    lcd_backlight(1);
-    lcd_display(0, 0, "C1000ms:");
-    lcd_display(0, 1, "C 100ms:");
 
     /* Initialize deadlines */
     app_data->c100ms_dl = deadline_make(0);
@@ -213,42 +209,6 @@ static void app_init(struct app_data *app_data)
 static void h_timer_expired(void)
 {
     led_blink(&app_data.user_led_2);
-}
-
-static unsigned count_digits(int num)
-{
-    unsigned num_digits = 0;
-
-    do {
-        num_digits++;
-    } while (num /= 10);
-
-    return num_digits;
-}
-
-static char *itoa(char dst[], int num)
-{
-    int i;
-    int sign;
-    unsigned num_digits = 0;
-
-    if ((sign = num) < 0) {
-        num = -num;
-        num_digits = 1; /* for the sign */
-    }
-    num_digits += count_digits(num);
-
-    i = num_digits;
-    do {
-        dst[--i] = '0' + num % 10;
-    } while(num /= 10);
-
-    if (sign < 0) {
-        dst[0] = '-';
-    }
-    dst[num_digits] = '\0';
-
-    return dst;
 }
 
 /**

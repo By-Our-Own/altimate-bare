@@ -1,5 +1,5 @@
 #include "lcd.h"
-#include "utils.h"
+#include "delay.h"
 
 #define LCD_WIDTH   16
 #define LCD_LINES   2
