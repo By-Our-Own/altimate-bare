@@ -40,8 +40,6 @@
 #define ARRAY_SIZE(X) (sizeof(X) / sizeof(X[0]))
 
 /* Private variables ---------------------------------------------------------*/
-const static uint8_t button_response_time = 40U; /* Should be in (10, 50] msec */
-const static uint8_t button_filter_times = 8U;
 
 /* For the LED frequencies */
 static struct tim_settings {
@@ -104,7 +102,7 @@ int main(void)
     c100ms = 0U;
 
     /* Initialize flags and states */
-    debounce_period = button_response_time / button_filter_times;
+    debounce_period = button_debounce_time_ms(&app_data.user_button_1);
 
     button_down = 0U;
     last_button = 0U;
@@ -170,31 +168,28 @@ static void app_init(struct app_data *app_data)
     board_init();
 
     /* Initialize LCD */
-    iohandle_init(&app_data->lcd_conn[LCD_E], GPIOC, LL_GPIO_PIN_7, GPIO_OUTPUT, 0, 0);
-    iohandle_init(&app_data->lcd_conn[LCD_RS], GPIOA, LL_GPIO_PIN_9, GPIO_OUTPUT, 0, 0);
-    iohandle_init(&app_data->lcd_conn[LCD_RW], GPIOA, LL_GPIO_PIN_8, GPIO_OUTPUT, 0, 0);
-    iohandle_init(&app_data->lcd_conn[LCD_DB4], GPIOB, LL_GPIO_PIN_10, GPIO_OUTPUT, 0, 0);
-    iohandle_init(&app_data->lcd_conn[LCD_DB5], GPIOB, LL_GPIO_PIN_4, GPIO_OUTPUT, 0, 0);
-    iohandle_init(&app_data->lcd_conn[LCD_DB6], GPIOB, LL_GPIO_PIN_5, GPIO_OUTPUT, 0, 0);
-    iohandle_init(&app_data->lcd_conn[LCD_DB7], GPIOB, LL_GPIO_PIN_3, GPIO_OUTPUT, 0, 0);
-    iohandle_init(&app_data->lcd_conn[LCD_BL], GPIOB, LL_GPIO_PIN_6, GPIO_OUTPUT, 0, 0);
+    iohandle_init(&app_data->lcd_conn[LCD_E], GPIOC, LL_GPIO_PIN_7, GPIO_OUTPUT);
+    iohandle_init(&app_data->lcd_conn[LCD_RS], GPIOA, LL_GPIO_PIN_9, GPIO_OUTPUT);
+    iohandle_init(&app_data->lcd_conn[LCD_RW], GPIOA, LL_GPIO_PIN_8, GPIO_OUTPUT);
+    iohandle_init(&app_data->lcd_conn[LCD_DB4], GPIOB, LL_GPIO_PIN_10, GPIO_OUTPUT);
+    iohandle_init(&app_data->lcd_conn[LCD_DB5], GPIOB, LL_GPIO_PIN_4, GPIO_OUTPUT);
+    iohandle_init(&app_data->lcd_conn[LCD_DB6], GPIOB, LL_GPIO_PIN_5, GPIO_OUTPUT);
+    iohandle_init(&app_data->lcd_conn[LCD_DB7], GPIOB, LL_GPIO_PIN_3, GPIO_OUTPUT);
+    iohandle_init(&app_data->lcd_conn[LCD_BL], GPIOB, LL_GPIO_PIN_6, GPIO_OUTPUT);
 
     lcd_init(&app_data->lcd_conn);
 
     app_data->led_idx = 0U;
 
     /* Initialize on board LED */
-    iohandle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, GPIO_OUTPUT,
-                  0U, 0U);
-    // iohandle_init(&app_data->user_led_2, GPIOA, LL_GPIO_PIN_15, GPIO_OUTPUT,
-    //               0U, 0U);
+    iohandle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, GPIO_OUTPUT);
+    // iohandle_init(&app_data->user_led_2, GPIOA, LL_GPIO_PIN_15, GPIO_OUTPUT);
     led_init(&app_data->user_led_2);
     led_off(&app_data->user_led_2);
 
     /* Initialize on board button */
-    iohandle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, GPIO_INPUT,
-                  1U, button_filter_times);
-    button_init(&app_data->user_button_1);
+    iohandle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, GPIO_INPUT);
+    button_init(&app_data->user_button_1, 5U);
 
     /* Initialize timer for generation of the LED blinking frequencies */
     timer_configure(tim_led_settings[app_data->led_idx].frequency,

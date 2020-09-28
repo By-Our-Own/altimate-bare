@@ -7,14 +7,16 @@
 /**
  * @brief Initialize a button component
  *
- * @param iohandle The IO handle to the button
+ * @param iohandle          The IO handle to the button
+ * @param debounce_order    Times to filter during debouncing: (0, 8]\
+ *                          0 for no debouncing
  *
  * @retval none
  */
-void button_init(const struct iohandle *iohandle);
+void button_init(struct iohandle *iohandle, uint8_t debounce_order);
 
 /**
- * @brief Check if button is pressed
+ * @brief Check if button is pressed withoud debouncing
  *
  * @param iohandle The IO handle to the button
  *
@@ -25,6 +27,7 @@ uint8_t button_pressed(const struct iohandle *iohandle);
 
 /**
  * @brief Check if debounced button is pressed
+ * @note If debouncing is disabled, a call to button_pressed() is returned
  *
  * @param iohandle The IO handle to the button
  *
@@ -32,5 +35,14 @@ uint8_t button_pressed(const struct iohandle *iohandle);
  * @retval 0 otherwise
  */
 uint8_t button_filter(struct iohandle *iohandle);
+
+/**
+ * @brief Get the time the button needs to be debounced in milliseconds
+ *
+ * @param iohandle The IO handle to the button
+ *
+ * @return Time in milliseconds
+ */
+uint8_t button_debounce_time_ms(const struct iohandle *iohandle);
 
 #endif /* _BSP_BUTTON_H */

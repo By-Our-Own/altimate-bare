@@ -10,6 +10,7 @@ struct iohandle {
     GPIO_TypeDef *gpio_port;
     uint32_t gpio_pin;
     enum gpio_direction gpio_dir;
+    uint8_t debouncing_order;
     uint8_t debouncing_accumulator;
     uint8_t debouncing_val;
 
@@ -28,16 +29,12 @@ struct iohandle {
  * @param[in]   gpio_port       The GPIO Port of the IO pin
  * @param       gpio_pin        The GPIO Pin number of the IO pin
  * @param       gpio_direction  The direction of the IO pin
- * @param       debounced       Enable debouncing. Only if GPIO_INPUT
- * @param       filter_order    Times to filter during debouncing. Valid values: (0, 8]
  *
  * @return none
  */
 void iohandle_init(struct iohandle *iohandle,
                    GPIO_TypeDef *gpio_port,
                    uint32_t gpio_pin,
-                   enum gpio_direction direction,
-                   uint8_t debounced,
-                   uint8_t filter_order);
+                   enum gpio_direction direction);
 
 #endif /* _BSP_IOHANDLE_H */

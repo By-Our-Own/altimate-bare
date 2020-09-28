@@ -10,18 +10,11 @@ static void __toggle(const struct iohandle *this);
 void iohandle_init(struct iohandle *iohandle,
                     GPIO_TypeDef *gpio_port,
                     uint32_t gpio_pin,
-                    enum gpio_direction direction,
-                    uint8_t debounced,
-                    uint8_t filter_order)
+                    enum gpio_direction direction)
 {
     iohandle->gpio_port = gpio_port;
     iohandle->gpio_pin = gpio_pin;
     iohandle->gpio_dir = direction;
-
-    if (iohandle->gpio_dir == GPIO_INPUT && debounced) {
-        iohandle->debouncing_accumulator = 0U;
-        iohandle->debouncing_val = (1U << (8U - filter_order + 1U)) - 1U;
-    }
 
     iohandle->config = __config;
 
