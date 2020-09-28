@@ -129,9 +129,9 @@ C_INCLUDES =  \
 -ICore/Inc \
 -IBSP/Inc \
 -IDevices/Inc \
+-IScheduler/Inc \
 -IDrivers/STM32L0xx_HAL_Driver/Inc \
 -IDrivers/CMSIS/Device/ST/STM32L0xx/Include \
--IDrivers/CMSIS/Include \
 -IDrivers/CMSIS/Include
 
 

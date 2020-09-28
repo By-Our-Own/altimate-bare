@@ -27,6 +27,7 @@
 #include "console.h"
 #include "timer.h"
 #include "lcd.h"
+#include "deadline.h"
 #include <string.h>
 
 /* Private includes ----------------------------------------------------------*/
@@ -61,6 +62,12 @@ static struct app_data {
     struct iohandle lcd_conn[8];
 
     volatile uint8_t led_idx;
+
+    uint16_t c100ms_dl;
+    uint16_t c1000ms_dl;
+    uint16_t button_dl;
+    uint16_t lcd_dl;
+    uint16_t lcd_flag;
 } app_data;
 
 /* Private function prototypes -----------------------------------------------*/
@@ -78,11 +85,12 @@ static void h_timer_expired(void);
 int main(void)
 {
     uint32_t now;
-    uint32_t start_debouncing;
     uint8_t button_down;
     uint8_t last_button;
     uint8_t button_flag;
     uint8_t debounce_period;
+    uint16_t c1000ms;
+    uint16_t c100ms;
 
     app_init(&app_data);
     now = millis();
@@ -92,6 +100,9 @@ int main(void)
     console_write(itoa(num, now), strlen(num));
     console_write(" ms\n\r", 5);
 
+    c1000ms = 0U;
+    c100ms = 0U;
+
     /* Initialize flags and states */
     debounce_period = button_response_time / button_filter_times;
 
@@ -99,15 +110,25 @@ int main(void)
     last_button = 0U;
     button_flag = 0U;
 
-    start_debouncing = millis();
-
     /* Infinite loop */
     while (1) {
-        /* If enough time has passed, blink */
-        now = millis();
-        if (now - start_debouncing >= debounce_period) {
-            start_debouncing = now;
+        /* Handle 1000ms counter */
+        if (deadline_reached(app_data.c1000ms_dl)) {
+            c1000ms++;
+            app_data.c1000ms_dl = deadline_extend(app_data.c1000ms_dl, 1000);
+            if (!(c1000ms % 1000)) {
+                app_data.lcd_flag = 1;  /* Display smooth 1 second changes */
+            }
+        }
 
+        /* Handle 100ms counter */
+        if (deadline_reached(app_data.c100ms_dl)) {
+            c100ms++;
+            app_data.c100ms_dl = deadline_extend(app_data.c100ms_dl, 100);
+        }
+
+        /* Handle button presses */
+        if (deadline_reached(app_data.button_dl)) {
             /* Get filtered button output and update states and flags */
             button_down = button_filter(&app_data.user_button_1);
             button_flag = button_down && !last_button;
@@ -122,7 +143,22 @@ int main(void)
                                 h_timer_expired);
 
                 button_flag = 0U;
-                console_write("Button pressed\n\r", 16);
+                // console_write("Button pressed\n\r", 16);
+            }
+
+            app_data.button_dl = deadline_extend(app_data.button_dl, debounce_period);
+        }
+
+        /* Handle LCD refresh */
+        if (app_data.lcd_flag || deadline_reached(app_data.lcd_dl)) {
+            lcd_display(9, 0, itoa(num, c1000ms));
+            lcd_display(9, 1, itoa(num, c100ms));
+
+            if (app_data.lcd_flag) {
+                app_data.lcd_flag = 0;
+                app_data.lcd_dl = deadline_make(400);
+            } else {
+                app_data.lcd_dl = deadline_extend(app_data.lcd_dl, 400);
             }
         }
     }
@@ -144,11 +180,6 @@ static void app_init(struct app_data *app_data)
     iohandle_init(&app_data->lcd_conn[LCD_BL], GPIOB, LL_GPIO_PIN_6, GPIO_OUTPUT, 0, 0);
 
     lcd_init(&app_data->lcd_conn);
-    lcd_backlight(1);
-    lcd_display(0, 0, "How you doin?!");
-    delay_ms(2000);
-    // lcd_clear();
-    lcd_display(3, 1, "Mmmm?");
 
     app_data->led_idx = 0U;
 
@@ -170,6 +201,18 @@ static void app_init(struct app_data *app_data)
                     tim_led_settings[app_data->led_idx].autorelod,
                     h_timer_expired);
     timer_start();
+
+    /* Initialize UI */
+    lcd_backlight(1);
+    lcd_display(0, 0, "C1000ms:");
+    lcd_display(0, 1, "C 100ms:");
+
+    /* Initialize deadlines */
+    app_data->c100ms_dl = deadline_make(0);
+    app_data->c1000ms_dl = deadline_make(0);
+    app_data->button_dl = deadline_make(0);
+    app_data->lcd_dl = deadline_make(0);
+    app_data->lcd_flag = 0;
 }
 
 static void h_timer_expired(void)
