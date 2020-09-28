@@ -42,16 +42,6 @@
 
 /* Private variables ---------------------------------------------------------*/
 
-/* For the LED frequencies */
-static struct tim_settings {
-    uint32_t frequency;
-    uint32_t autorelod;
-} tim_led_settings[3] = {
-    {13000U, 2000U},    /* 6.5Hz */
-    {17000U, 2000U},    /* 8.5Hz */
-    {20000U, 2000U},    /* 10Hz */
-};
-
 static char message[] = "System initilized at ";
 static char num_buf[11];
 
@@ -62,8 +52,7 @@ static struct app_data {
 
     volatile uint8_t led_idx;
 
-    uint16_t c100ms_dl;
-    uint16_t c1000ms_dl;
+    uint16_t baro_dl;
     uint16_t button_dl;
     uint16_t lcd_dl;
     uint16_t lcd_flag;
@@ -71,7 +60,29 @@ static struct app_data {
 
 /* Private function prototypes -----------------------------------------------*/
 static void app_init(struct app_data *app_data);
-static void h_timer_expired(void);
+
+static uint16_t get_pressure(void)
+{
+    static uint16_t i = 0;
+    uint16_t press[5] = { 4, 67, 130, 50, 3};
+    return press[(i++) % 5];
+}
+
+static int16_t get_temperature(void)
+{
+    static uint8_t i = 0;
+    int8_t temp[5] = { 24, 25, 23, 22, 21};
+    return temp[(i++) % 5];
+}
+
+static int16_t get_height(int16_t reset)
+{
+    static uint16_t i = 0;
+    if (reset) {
+        i = 0;
+    }
+    return i++;
+}
 
 /* Private user code ---------------------------------------------------------*/
 
@@ -85,8 +96,9 @@ int main(void)
     uint8_t last_button;
     uint8_t button_flag;
     uint8_t debounce_period;
-    uint16_t c1000ms;
-    uint16_t c100ms;
+    uint16_t pressure;
+    int16_t temperature;
+    int16_t height;
 
     app_init(&app_data);
 
@@ -102,24 +114,18 @@ int main(void)
     last_button = 0U;
     button_flag = 0U;
 
-    c1000ms = 0U;
-    c100ms = 0U;
+    pressure = get_pressure();
+    temperature = get_temperature();
+    height = get_height(1);
 
     /* Infinite loop */
     while (1) {
-        /* Handle 1000ms counter */
-        if (deadline_reached(app_data.c1000ms_dl)) {
-            c1000ms++;
-            if (!(c1000ms % 1000)) {
-                app_data.lcd_flag = 1;  /* Display smooth 1 second changes */
-            }
-            app_data.c1000ms_dl = deadline_extend(app_data.c1000ms_dl, 1000);
-        }
-
-        /* Handle 100ms counter */
-        if (deadline_reached(app_data.c100ms_dl)) {
-            c100ms++;
-            app_data.c100ms_dl = deadline_extend(app_data.c100ms_dl, 100);
+        /* Handle sensor readings */
+        if (deadline_reached(app_data.baro_dl)) {
+            pressure = get_pressure();
+            temperature = get_temperature();
+            height = get_height(0);
+            app_data.baro_dl = deadline_extend(app_data.baro_dl, 100);
         }
 
         /* Handle button presses */
@@ -131,11 +137,8 @@ int main(void)
 
             /* If button is pressed, get next delay */
             if (button_flag) {
-                /* Get next led blinking frequency*/
-                app_data.led_idx = (app_data.led_idx + 1) % ARRAY_SIZE(tim_led_settings);
-                timer_configure(tim_led_settings[app_data.led_idx].frequency,
-                                tim_led_settings[app_data.led_idx].autorelod,
-                                h_timer_expired);
+                height = get_height(1);
+                app_data.lcd_flag = 1;
 
                 button_flag = 0U;
             }
@@ -145,8 +148,14 @@ int main(void)
 
         /* Handle LCD refresh */
         if (app_data.lcd_flag || deadline_reached(app_data.lcd_dl)) {
-            lcd_display(9, 0, misc_itoa(num_buf, c1000ms));
-            lcd_display(9, 1, misc_itoa(num_buf, c100ms));
+            /* Blanken the value fields */
+            lcd_display(5, 0, "         ");
+            lcd_display(5, 1, "     ");
+
+            /* Fill the value fields */
+            lcd_display(5, 0, misc_itoa(num_buf, pressure));
+            lcd_display(10, 0, misc_itoa(num_buf, height));
+            lcd_display(5, 1, misc_itoa(num_buf, temperature));
 
             if (app_data.lcd_flag) {
                 app_data.lcd_flag = 0;
@@ -176,8 +185,8 @@ static void app_init(struct app_data *app_data)
 
     /* Initialize UI */
     lcd_backlight(1);
-    lcd_display(0, 0, "C1000ms:");
-    lcd_display(0, 1, "C 100ms:");
+    lcd_display(0, 0, "kPa:          :m");
+    lcd_display(0, 1, "oC:");
 
 
     /* Initialize on board LED */
@@ -190,25 +199,11 @@ static void app_init(struct app_data *app_data)
     iohandle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, GPIO_INPUT);
     button_init(&app_data->user_button_1, 5U);
 
-    /* Initialize timer for generation of the LED blinking frequencies */
-    app_data->led_idx = 0U;
-
-    timer_configure(tim_led_settings[app_data->led_idx].frequency,
-                    tim_led_settings[app_data->led_idx].autorelod,
-                    h_timer_expired);
-    timer_start();
-
     /* Initialize deadlines */
-    app_data->c100ms_dl = deadline_make(0);
-    app_data->c1000ms_dl = deadline_make(0);
+    app_data->baro_dl = deadline_make(0);
     app_data->button_dl = deadline_make(0);
     app_data->lcd_dl = deadline_make(0);
     app_data->lcd_flag = 0;
-}
-
-static void h_timer_expired(void)
-{
-    led_blink(&app_data.user_led_2);
 }
 
 /**
