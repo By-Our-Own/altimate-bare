@@ -49,6 +49,7 @@ static struct app_data {
     struct iohandle user_led_2;
     struct iohandle user_button_1;
     struct iohandle lcd_conn[8];
+    struct iohandle_bus lcd_bus;
 
     volatile uint8_t led_idx;
 
@@ -104,7 +105,8 @@ int main(void)
 
     /* Print welcome message */
     console_write(message, strlen(message));
-    console_write(misc_itoa(num_buf, millis()), strlen(num_buf));
+    misc_itoa(num_buf, millis());
+    console_write(num_buf, strlen(num_buf));
     console_write(" ms\n\r", 5);
 
     /* Initialize flags and states */
@@ -173,15 +175,8 @@ static void app_init(struct app_data *app_data)
     board_init();
 
     /* Initialize LCD */
-    iohandle_init(&app_data->lcd_conn[LCD_E], GPIOC, LL_GPIO_PIN_7, GPIO_OUTPUT);
-    iohandle_init(&app_data->lcd_conn[LCD_RS], GPIOA, LL_GPIO_PIN_9, GPIO_OUTPUT);
-    iohandle_init(&app_data->lcd_conn[LCD_RW], GPIOA, LL_GPIO_PIN_8, GPIO_OUTPUT);
-    iohandle_init(&app_data->lcd_conn[LCD_DB4], GPIOB, LL_GPIO_PIN_10, GPIO_OUTPUT);
-    iohandle_init(&app_data->lcd_conn[LCD_DB5], GPIOB, LL_GPIO_PIN_4, GPIO_OUTPUT);
-    iohandle_init(&app_data->lcd_conn[LCD_DB6], GPIOB, LL_GPIO_PIN_5, GPIO_OUTPUT);
-    iohandle_init(&app_data->lcd_conn[LCD_DB7], GPIOB, LL_GPIO_PIN_3, GPIO_OUTPUT);
-    iohandle_init(&app_data->lcd_conn[LCD_BL], GPIOB, LL_GPIO_PIN_6, GPIO_OUTPUT);
-    lcd_init(&app_data->lcd_conn);
+    iohandle_bus_init(&app_data->lcd_bus, GPIOB, LL_GPIO_PIN_8, LL_GPIO_PIN_15, GPIO_OUTPUT);
+    lcd_init(&app_data->lcd_bus);
 
     /* Initialize UI */
     lcd_backlight(1);
