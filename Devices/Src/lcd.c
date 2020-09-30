@@ -27,41 +27,40 @@
 
 #define CURS_RH      0x02
 
-#define rs  ((*lcd_conn)[LCD_RS])
-#define rw  ((*lcd_conn)[LCD_RW])
-#define en  ((*lcd_conn)[LCD_E])
-#define db4  ((*lcd_conn)[LCD_DB4])
-#define db5  ((*lcd_conn)[LCD_DB5])
-#define db6  ((*lcd_conn)[LCD_DB6])
-#define db7  ((*lcd_conn)[LCD_DB7])
-#define bl  ((*lcd_conn)[LCD_BL])
+#define BL 0x80
+#define EN 0x40
+#define RS 0x20
+#define RW 0x10
+#define DB7 0x08
+#define DB6 0x04
+#define DB5 0x02
+#define DB4 0x01
 
-static const struct iohandle (*lcd_conn)[8];
+#define DATA_MASK   (DB7|DB6|DB5|DB4)
+
+static const struct iohandle_bus *lcd_conn;
 
 static void _lcd_strobe(void)
 {
-    en.set(&en);
+    lcd_conn->set(lcd_conn, EN);
 
-    volatile int8_t i = 10;
+    /* Super tiny delay >= 230ns */
+    volatile int8_t i = 1;
     while(i--) {
     }
 
-    en.reset(&en);
+    lcd_conn->reset(lcd_conn, EN);
 }
 
-static void _lcd_data_write_4bits(uint8_t data)
+static inline void _lcd_data_write_4bits(uint8_t data)
 {
-    rs.reset(&rs);
-    rw.reset(&rw);
-    (data & (1 << 3)) ? db7.set(&db7) : db7.reset(&db7);
-    (data & (1 << 2)) ? db6.set(&db6) : db6.reset(&db6);
-    (data & (1 << 1)) ? db5.set(&db5) : db5.reset(&db5);
-    (data & (1 << 0)) ? db4.set(&db4) : db4.reset(&db4);
+    uint16_t val = lcd_conn->read(lcd_conn) & (~DATA_MASK);
+    lcd_conn->write(lcd_conn, val | (data & DATA_MASK));
 
     _lcd_strobe();
 }
 
-static void _lcd_send_cmd(uint8_t data)
+static inline void _lcd_send_cmd(uint8_t data)
 {
     _lcd_data_write_4bits(data >> 4);   /* Send hi 4bits */
     _lcd_data_write_4bits(data);        /* Send lo 4bits */
@@ -75,36 +74,21 @@ static void _lcd_send_cmd(uint8_t data)
  */
 static void _lcd_cmd_place_cursor(uint8_t pos)
 {
-    rs.reset(&rs);
-    rw.reset(&rw);
+    lcd_conn->reset(lcd_conn, RS|RW);
 
-    /* First strobe */
-    db7.set(&db7);
-    (pos & (1 << 6)) ? db6.set(&db6) : db6.reset(&db6);
-    (pos & (1 << 5)) ? db5.set(&db5) : db5.reset(&db5);
-    (pos & (1 << 4)) ? db4.set(&db4) : db4.reset(&db4);
-
-    _lcd_strobe();
-
-    (pos & (1 << 3)) ? db7.set(&db7) : db7.reset(&db7);
-    (pos & (1 << 2)) ? db6.set(&db6) : db6.reset(&db6);
-    (pos & (1 << 1)) ? db5.set(&db5) : db5.reset(&db5);
-    (pos & (1 << 0)) ? db4.set(&db4) : db4.reset(&db4);
-
-    _lcd_strobe();
+    _lcd_send_cmd(0x80 | (pos & 0x7f));
 }
 
-void lcd_init(const struct iohandle (*conn)[8])
+void lcd_init(const struct iohandle_bus *conn)
 {
-    uint8_t i;
     lcd_conn = conn;
 
     /* Configure every pin */
-    for (i = 0; i < 8; i++) {
-        ((*lcd_conn)[i]).config(&((*lcd_conn)[i]));
-    }
+    lcd_conn->config(lcd_conn);
 
     delay_ms(16);   /* Wait for more than 15 ms */
+
+    lcd_conn->reset(lcd_conn, RS|RW);
 
     _lcd_data_write_4bits(DISP_INIT);
 
@@ -142,27 +126,16 @@ void lcd_init(const struct iohandle (*conn)[8])
  */
 void lcd_putc(uint8_t c)
 {
-    rs.set(&rs);
-    rw.reset(&rw);
+    lcd_conn->set(lcd_conn, RS);
+    lcd_conn->reset(lcd_conn, RW);
 
-    /* First strobe */
-    (c & (1 << 7)) ? db7.set(&db7) : db7.reset(&db7);
-    (c & (1 << 6)) ? db6.set(&db6) : db6.reset(&db6);
-    (c & (1 << 5)) ? db5.set(&db5) : db5.reset(&db5);
-    (c & (1 << 4)) ? db4.set(&db4) : db4.reset(&db4);
-
-    _lcd_strobe();
-
-    (c & (1 << 3)) ? db7.set(&db7) : db7.reset(&db7);
-    (c & (1 << 2)) ? db6.set(&db6) : db6.reset(&db6);
-    (c & (1 << 1)) ? db5.set(&db5) : db5.reset(&db5);
-    (c & (1 << 0)) ? db4.set(&db4) : db4.reset(&db4);
-
-    _lcd_strobe();
+    _lcd_data_write_4bits(c >> 4);
+    _lcd_data_write_4bits(c);
 }
 
 void lcd_clear(void)
 {
+    lcd_conn->reset(lcd_conn, RS|RW);
     _lcd_send_cmd(DISP_CLEAR);
     delay_ms(2);
 }
@@ -191,5 +164,9 @@ void lcd_display(int x, int y, const char *msg)
 
 void lcd_backlight(uint8_t on)
 {
-    on ? bl.set(&bl) : bl.reset(&bl);
+    if (on) {
+        lcd_conn->set(lcd_conn, BL);
+    } else {
+        lcd_conn->reset(lcd_conn, BL);
+    }
 }
