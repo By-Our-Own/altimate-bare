@@ -2,46 +2,46 @@
 
 #define BUTTON_RESPONSE_TIME_MS 40U /* Should be in (10, 50] msec */
 
-void button_init(struct iohandle *iohandle, uint8_t debounce_order)
+void button_init(struct io_handle *io_handle, uint8_t debounce_order)
 {
-    if (iohandle->gpio_dir == GPIO_INPUT) {
+    if (io_handle->dir == GPIO_INPUT) {
         if (debounce_order > 0 && debounce_order <= 8) {
-            iohandle->debouncing_order = debounce_order;
-            iohandle->debouncing_accumulator = 0U;
-            iohandle->debouncing_val = (1U << (8U - debounce_order + 1U)) - 1U;
+            io_handle->debouncing_order = debounce_order;
+            io_handle->debouncing_accumulator = 0U;
+            io_handle->debouncing_val = (1U << (8U - debounce_order + 1U)) - 1U;
         } else {
-            iohandle->debouncing_order = 0U;
+            io_handle->debouncing_order = 0U;
         }
     }
 
-    iohandle->config(iohandle);
+    io_handle->config(io_handle);
 }
 
-uint8_t button_pressed(const struct iohandle *iohandle)
+uint8_t button_pressed(const struct io_handle *io_handle)
 {
-    return !iohandle->get(iohandle);
+    return !io_handle->get(io_handle);
 }
 
-uint8_t button_filter(struct iohandle *iohandle)
+uint8_t button_filter(struct io_handle *io_handle)
 {
-    if (iohandle->debouncing_order) {
-        iohandle->debouncing_accumulator <<= 1U;
-        if (!iohandle->get(iohandle)) {
-            iohandle->debouncing_accumulator |= iohandle->debouncing_val;
+    if (io_handle->debouncing_order) {
+        io_handle->debouncing_accumulator <<= 1U;
+        if (!io_handle->get(io_handle)) {
+            io_handle->debouncing_accumulator |= io_handle->debouncing_val;
         } else {
-            iohandle->debouncing_accumulator &= ~iohandle->debouncing_val;
+            io_handle->debouncing_accumulator &= ~io_handle->debouncing_val;
         }
-        return (iohandle->debouncing_accumulator == (uint8_t)~0U) ? 1U : 0U;
+        return (io_handle->debouncing_accumulator == (uint8_t)~0U) ? 1U : 0U;
     }
 
-    return button_pressed(iohandle);
+    return button_pressed(io_handle);
 }
 
-uint8_t button_debounce_time_ms(const struct iohandle *iohandle)
+uint8_t button_debounce_time_ms(const struct io_handle *io_handle)
 {
-    if (iohandle->debouncing_order == 0U) {
+    if (io_handle->debouncing_order == 0U) {
         return 0U;
     }
-    return BUTTON_RESPONSE_TIME_MS / iohandle->debouncing_order;
+    return BUTTON_RESPONSE_TIME_MS / io_handle->debouncing_order;
 }
 

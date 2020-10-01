@@ -1,7 +1,7 @@
 #ifndef _DEVICES_LCD_H
 #define _DEVICES_LCD_H
 
-#include "iohandle.h"
+#include "io_handle.h"
 
 /**
  * @brief Initialize a LCD device
@@ -19,7 +19,7 @@
  *
  * @retval none
  */
-void lcd_init(const struct iohandle_bus *conn);
+void lcd_init(const struct io_handle_bus *conn);
 
 /**
  * @brief Turn on/off the backlight

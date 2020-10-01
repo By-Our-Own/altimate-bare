@@ -22,7 +22,7 @@
 #include "led.h"
 #include "button.h"
 #include "iointerrupt.h"
-#include "iohandle.h"
+#include "io_handle.h"
 #include "console.h"
 #include "timer.h"
 #include "lcd.h"
@@ -46,10 +46,9 @@ static char message[] = "System initilized at ";
 static char num_buf[11];
 
 static struct app_data {
-    struct iohandle user_led_2;
-    struct iohandle user_button_1;
-    struct iohandle lcd_conn[8];
-    struct iohandle_bus lcd_bus;
+    struct io_handle user_led_2;
+    struct io_handle user_button_1;
+    struct io_handle_bus lcd_bus;
 
     volatile uint8_t led_idx;
 
@@ -171,11 +170,13 @@ int main(void)
 
 static void app_init(struct app_data *app_data)
 {
+    struct ioconfig cfg = { 0 };
+
     /* Initialize system */
     board_init();
 
     /* Initialize LCD */
-    iohandle_bus_init(&app_data->lcd_bus, GPIOB, LL_GPIO_PIN_8, LL_GPIO_PIN_15, GPIO_OUTPUT);
+    io_handle_bus_init(&app_data->lcd_bus, GPIOB, 8, 15, GPIO_OUTPUT);
     lcd_init(&app_data->lcd_bus);
 
     /* Initialize UI */
@@ -185,13 +186,21 @@ static void app_init(struct app_data *app_data)
 
 
     /* Initialize on board LED */
-    iohandle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, GPIO_OUTPUT);
-    // iohandle_init(&app_data->user_led_2, GPIOA, LL_GPIO_PIN_15, GPIO_OUTPUT);
+    cfg.dir = GPIO_OUTPUT;
+    cfg.otype = GPIO_PUSHPULL;
+    cfg.pull = GPIO_PULL_NO;
+    cfg.speed = GPIO_SPEED_LOW;
+    io_handle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, &cfg);
+    // io_handle_init(&app_data->user_led_2, GPIOA, 15, GPIO_OUTPUT);
     led_init(&app_data->user_led_2);
-    led_off(&app_data->user_led_2);
+    led_on(&app_data->user_led_2);
 
     /* Initialize on board button */
-    iohandle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, GPIO_INPUT);
+    cfg.dir = GPIO_INPUT;
+    cfg.otype = GPIO_PUSHPULL;
+    cfg.pull = GPIO_PULL_UP;
+    cfg.speed = GPIO_SPEED_LOW;
+    io_handle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, &cfg);
     button_init(&app_data->user_button_1, 5U);
 
     /* Initialize deadlines */

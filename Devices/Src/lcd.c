@@ -38,7 +38,7 @@
 
 #define DATA_MASK   (DB7|DB6|DB5|DB4)
 
-static const struct iohandle_bus *lcd_conn;
+static const struct io_handle_bus *lcd_conn;
 
 static void _lcd_strobe(void)
 {
@@ -79,7 +79,7 @@ static void _lcd_cmd_place_cursor(uint8_t pos)
     _lcd_send_cmd(0x80 | (pos & 0x7f));
 }
 
-void lcd_init(const struct iohandle_bus *conn)
+void lcd_init(const struct io_handle_bus *conn)
 {
     lcd_conn = conn;
 

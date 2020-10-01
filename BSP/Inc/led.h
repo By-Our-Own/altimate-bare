@@ -1,42 +1,42 @@
 #ifndef _BSP_LED_H
 #define _BSP_LED_H
 
-#include "iohandle.h"
+#include "io_handle.h"
 
 /**
  * @brief Initialize a LED component
  *
- * @param iohandle The IO handle to the LED
+ * @param io_handle The IO handle to the LED
  *
  * @retval none
  */
-void led_init(const struct iohandle *iohandle);
+void led_init(const struct io_handle *io_handle);
 
 /**
  * @brief Blink the LED
  *
- * @param iohandle The IO handle to the LED
+ * @param io_handle The IO handle to the LED
  *
  * @retval none
  */
-void led_blink(const struct iohandle *iohandle);
+void led_blink(const struct io_handle *io_handle);
 
 /**
  * @brief Turn the LED on
  *
- * @param iohandle The IO handle to the LED
+ * @param io_handle The IO handle to the LED
  *
  * @retval none
  */
-void led_on(const struct iohandle *iohandle);
+void led_on(const struct io_handle *io_handle);
 
 /**
  * @brief Turn the LED off
  *
- * @param iohandle The IO handle to the LED
+ * @param io_handle The IO handle to the LED
  *
  * @retval none
  */
-void led_off(const struct iohandle *iohandle);
+void led_off(const struct io_handle *io_handle);
 
 #endif /* _BSP_LED_H */
