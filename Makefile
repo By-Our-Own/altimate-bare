@@ -62,7 +62,8 @@ Devices/Src/lcd.c \
 Devices/Src/bmp3.c \
 Misc/Src/delay.c \
 Misc/Src/utils.c \
-Ext/BMP3-Sensor-API/bmp388.c
+Ext/BMP3-Sensor-API/bmp388.c \
+App/Src/gui.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -137,6 +138,7 @@ C_INCLUDES =  \
 -IScheduler/Inc \
 -IMisc/Inc \
 -IExt/BMP3-Sensor-API \
+-IApp/Inc \
 -IDrivers/STM32L0xx_HAL_Driver/Inc \
 -IDrivers/CMSIS/Device/ST/STM32L0xx/Include \
 -IDrivers/CMSIS/Include
