@@ -1,0 +1,3 @@
+[submodule "Ext/BMP3-Sensor-API"]
+	path = Ext/BMP3-Sensor-API
+	url = https://github.com/BoschSensortec/BMP3-Sensor-API.git
