@@ -57,6 +57,7 @@ BSP/Src/console.c \
 BSP/Src/io_handle.c \
 BSP/Src/timer.c \
 BSP/Src/iointerrupt.c \
+BSP/Src/i2c_handle.c \
 Devices/Src/lcd.c \
 Misc/Src/delay.c \
 Misc/Src/utils.c
