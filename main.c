@@ -33,6 +33,7 @@
 #include "utils.h"
 #include "bmp388.h"
 #include <string.h>
+#include <math.h>
 
 /* Private includes ----------------------------------------------------------*/
 
@@ -69,13 +70,19 @@ static struct app_data {
 /* Private function prototypes -----------------------------------------------*/
 static void app_init(struct app_data *app_data);
 
-static int64_t get_height(int16_t reset)
+static int64_t get_altitude(uint64_t pressure_zero, uint64_t pressure, int64_t temperature)
 {
-    static uint64_t i = 0;
-    if (reset) {
-        i = 0;
+    double altitude;
+
+    altitude = pow(pressure_zero / (double)pressure, 0.19) - 1;
+    altitude *= temperature + 273.15;
+    altitude /= 0.0065;
+
+    if (altitude > 9999) {
+        return -9999;
     }
-    return i++ % (9000 * 10);
+
+    return altitude * 10;
 }
 
 /* Private user code ---------------------------------------------------------*/
@@ -91,6 +98,7 @@ int main(void)
     uint8_t button_flag;
     uint8_t debounce_period;
     uint64_t pressure;
+    uint64_t pressure_zero;
     int64_t temperature;
     int64_t height;
 
@@ -98,7 +106,7 @@ int main(void)
 
     /* Print welcome message */
     console_write(message, strlen(message));
-    misc_itoa(num_buf, millis());
+    itoa(num_buf, millis(), 0);
     console_write(num_buf, strlen(num_buf));
     console_write(" ms\n\r", 5);
 
@@ -109,7 +117,13 @@ int main(void)
     last_button = 0U;
     button_flag = 0U;
 
-    height = get_height(1);
+    /* Initial readings */
+    if (bmp388_get_data(&app_data.bmp388_dev, &pressure, &temperature)) {
+        pressure = 0U;
+        temperature = 0U;
+    }
+    pressure_zero = pressure;
+    height = get_altitude(pressure_zero, pressure, temperature);
 
     /* Infinite loop */
     while (1) {
@@ -119,7 +133,7 @@ int main(void)
                 pressure = 0U;
                 temperature = 0U;
             }
-            height = get_height(0);
+            height = get_altitude(pressure_zero, pressure, temperature);
             app_data.baro_dl = deadline_extend(app_data.baro_dl, 100);
         }
 
@@ -132,7 +146,8 @@ int main(void)
 
             /* If button is pressed, get next delay */
             if (button_flag) {
-                height = get_height(1);
+                pressure_zero = pressure;
+                height = get_altitude(pressure_zero, pressure, temperature);
                 app_data.lcd_flag = 1;
 
                 button_flag = 0U;
