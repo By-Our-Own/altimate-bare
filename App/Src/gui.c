@@ -34,19 +34,19 @@ void gui_update(uint64_t pressure, int64_t temperature, int64_t altitude)
 
 	/* Show pressure: xxx.xxx kPa */
 	memset(num_buf, 0, PRESS_MAX_LEN + 1U);
-	fixed_point_to_str(num_buf, pressure, 0, PRESS_FRACTION_LEN, 3);
+	fptoa(num_buf, pressure, 0, PRESS_FRACTION_LEN, 3);
 	lcd_display(PRESS_OFF, 0, num_buf);
 	lcd_display(PRESS_OFF + strlen(num_buf), 0, " kPa");
 
-	/* Show temperature: [+- ]xx.x C */
+	/* Show temperature: [-]xx.x C */
 	memset(num_buf, 0, TEMP_MAX_LEN + 1U);
-	fixed_point_to_str(num_buf, temperature, 1, TEMP_FRACTION_LEN, 1);
+	fptoa(num_buf, temperature, 1, TEMP_FRACTION_LEN, 1);
 	lcd_display(TEMP_OFF, 1, num_buf);
 	lcd_display(TEMP_OFF + strlen(num_buf), 1, " C");
 
-	/* Show altitude: [+- ]xxxx.x m */
+	/* Show altitude: [-]xxxx.x m */
 	memset(num_buf, 0, ALTD_MAX_LEN + 1U);
-	fixed_point_to_str(num_buf, altitude, 0, ALTD_FRACTION_LEN, 1);
+	fptoa(num_buf, altitude, 1, ALTD_FRACTION_LEN, 1);
 	lcd_display(ALTD_OFF, 1, num_buf);
 	lcd_display(ALTD_OFF + strlen(num_buf), 1, " m");
 }
