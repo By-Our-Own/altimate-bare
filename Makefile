@@ -54,12 +54,16 @@ BSP/Src/board.c \
 BSP/Src/led.c \
 BSP/Src/button.c \
 BSP/Src/console.c \
-BSP/Src/iohandle.c \
+BSP/Src/io_handle.c \
 BSP/Src/timer.c \
 BSP/Src/iointerrupt.c \
+BSP/Src/i2c_handle.c \
 Devices/Src/lcd.c \
+Devices/Src/bmp3.c \
 Misc/Src/delay.c \
-Misc/Src/utils.c
+Misc/Src/utils.c \
+Ext/BMP3-Sensor-API/bmp388.c \
+App/Src/gui.c
 
 # ASM sources
 ASM_SOURCES =  \
@@ -119,7 +123,8 @@ C_DEFS =  \
 -DPREFETCH_ENABLE=0 \
 -DINSTRUCTION_CACHE_ENABLE=1 \
 -DDATA_CACHE_ENABLE=1 \
--DSTM32L073xx
+-DSTM32L073xx \
+-DBMP388_SLAVE_ADDR=0x77
 
 
 # AS includes
@@ -132,6 +137,8 @@ C_INCLUDES =  \
 -IDevices/Inc \
 -IScheduler/Inc \
 -IMisc/Inc \
+-IExt/BMP3-Sensor-API \
+-IApp/Inc \
 -IDrivers/STM32L0xx_HAL_Driver/Inc \
 -IDrivers/CMSIS/Device/ST/STM32L0xx/Include \
 -IDrivers/CMSIS/Include

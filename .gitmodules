@@ -1,0 +1,6 @@
+[submodule "Ext/BMP3-Sensor-API"]
+	path = Ext/BMP3-Sensor-API
+	url = https://github.com/BoschSensortec/BMP3-Sensor-API.git
+[submodule "Tests/Unity"]
+	path = Tests/Unity
+	url = https://github.com/ThrowTheSwitch/Unity.git

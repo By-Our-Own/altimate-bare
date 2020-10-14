@@ -17,19 +17,23 @@
  */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "gui.h"
+#include "lcd.h"
 #include "defs.h"
 #include "board.h"
 #include "led.h"
 #include "button.h"
 #include "iointerrupt.h"
-#include "iohandle.h"
+#include "io_handle.h"
+#include "i2c_handle.h"
 #include "console.h"
 #include "timer.h"
-#include "lcd.h"
 #include "deadline.h"
 #include "delay.h"
 #include "utils.h"
+#include "bmp388.h"
 #include <string.h>
+#include <math.h>
 
 /* Private includes ----------------------------------------------------------*/
 
@@ -46,10 +50,14 @@ static char message[] = "System initilized at ";
 static char num_buf[11];
 
 static struct app_data {
-    struct iohandle user_led_2;
-    struct iohandle user_button_1;
-    struct iohandle lcd_conn[8];
-    struct iohandle_bus lcd_bus;
+    struct io_handle user_led_2;
+    struct io_handle user_button_1;
+    struct io_handle_bus lcd_bus;
+
+    struct io_handle i2c_scl;
+    struct io_handle i2c_sda;
+    struct i2c_handle bmp388_i2c;
+    struct bmp388_handle bmp388_dev;
 
     volatile uint8_t led_idx;
 
@@ -62,27 +70,19 @@ static struct app_data {
 /* Private function prototypes -----------------------------------------------*/
 static void app_init(struct app_data *app_data);
 
-static uint16_t get_pressure(void)
+static int64_t get_altitude(uint64_t pressure_zero, uint64_t pressure, int64_t temperature)
 {
-    static uint16_t i = 0;
-    uint16_t press[5] = { 4, 67, 130, 50, 3};
-    return press[(i++) % 5];
-}
+    double altitude;
 
-static int16_t get_temperature(void)
-{
-    static uint8_t i = 0;
-    int8_t temp[5] = { 24, 25, 23, 22, 21};
-    return temp[(i++) % 5];
-}
+    altitude = pow(pressure_zero / (double)pressure, 0.19) - 1;
+    altitude *= temperature + 273.15;
+    altitude /= 0.0065;
 
-static int16_t get_height(int16_t reset)
-{
-    static uint16_t i = 0;
-    if (reset) {
-        i = 0;
+    if (altitude > 9999) {
+        return -9999;
     }
-    return i++;
+
+    return altitude * 10;
 }
 
 /* Private user code ---------------------------------------------------------*/
@@ -97,15 +97,16 @@ int main(void)
     uint8_t last_button;
     uint8_t button_flag;
     uint8_t debounce_period;
-    uint16_t pressure;
-    int16_t temperature;
-    int16_t height;
+    uint64_t pressure;
+    uint64_t pressure_zero;
+    int64_t temperature;
+    int64_t height;
 
     app_init(&app_data);
 
     /* Print welcome message */
     console_write(message, strlen(message));
-    misc_itoa(num_buf, millis());
+    itoa(num_buf, millis(), 0);
     console_write(num_buf, strlen(num_buf));
     console_write(" ms\n\r", 5);
 
@@ -116,17 +117,23 @@ int main(void)
     last_button = 0U;
     button_flag = 0U;
 
-    pressure = get_pressure();
-    temperature = get_temperature();
-    height = get_height(1);
+    /* Initial readings */
+    if (bmp388_get_data(&app_data.bmp388_dev, &pressure, &temperature)) {
+        pressure = 0U;
+        temperature = 0U;
+    }
+    pressure_zero = pressure;
+    height = get_altitude(pressure_zero, pressure, temperature);
 
     /* Infinite loop */
     while (1) {
         /* Handle sensor readings */
         if (deadline_reached(app_data.baro_dl)) {
-            pressure = get_pressure();
-            temperature = get_temperature();
-            height = get_height(0);
+            if (bmp388_get_data(&app_data.bmp388_dev, &pressure, &temperature)) {
+                pressure = 0U;
+                temperature = 0U;
+            }
+            height = get_altitude(pressure_zero, pressure, temperature);
             app_data.baro_dl = deadline_extend(app_data.baro_dl, 100);
         }
 
@@ -139,7 +146,8 @@ int main(void)
 
             /* If button is pressed, get next delay */
             if (button_flag) {
-                height = get_height(1);
+                pressure_zero = pressure;
+                height = get_altitude(pressure_zero, pressure, temperature);
                 app_data.lcd_flag = 1;
 
                 button_flag = 0U;
@@ -150,14 +158,7 @@ int main(void)
 
         /* Handle LCD refresh */
         if (app_data.lcd_flag || deadline_reached(app_data.lcd_dl)) {
-            /* Blanken the value fields */
-            lcd_display(5, 0, "         ");
-            lcd_display(5, 1, "     ");
-
-            /* Fill the value fields */
-            lcd_display(5, 0, misc_itoa(num_buf, pressure));
-            lcd_display(10, 0, misc_itoa(num_buf, height));
-            lcd_display(5, 1, misc_itoa(num_buf, temperature));
+            gui_update(pressure, temperature, height);
 
             if (app_data.lcd_flag) {
                 app_data.lcd_flag = 0;
@@ -171,28 +172,46 @@ int main(void)
 
 static void app_init(struct app_data *app_data)
 {
+    struct ioconfig cfg = { 0 };
+
     /* Initialize system */
     board_init();
 
     /* Initialize LCD */
-    iohandle_bus_init(&app_data->lcd_bus, GPIOB, LL_GPIO_PIN_8, LL_GPIO_PIN_15, GPIO_OUTPUT);
+    io_handle_bus_init(&app_data->lcd_bus, GPIOB, 8, 15, GPIO_OUTPUT);
     lcd_init(&app_data->lcd_bus);
 
     /* Initialize UI */
     lcd_backlight(1);
-    lcd_display(0, 0, "kPa:          :m");
-    lcd_display(0, 1, "oC:");
-
+    gui_welcome();
 
     /* Initialize on board LED */
-    iohandle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, GPIO_OUTPUT);
-    // iohandle_init(&app_data->user_led_2, GPIOA, LL_GPIO_PIN_15, GPIO_OUTPUT);
+    cfg.dir = GPIO_OUTPUT;
+    cfg.otype = GPIO_PUSHPULL;
+    cfg.pull = GPIO_PULL_NO;
+    cfg.speed = GPIO_SPEED_LOW;
+    io_handle_init(&app_data->user_led_2, LD2_GPIO_Port, LD2_Pin, &cfg);
     led_init(&app_data->user_led_2);
-    led_off(&app_data->user_led_2);
+    led_on(&app_data->user_led_2);
 
     /* Initialize on board button */
-    iohandle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, GPIO_INPUT);
+    cfg.dir = GPIO_INPUT;
+    cfg.otype = GPIO_PUSHPULL;
+    cfg.pull = GPIO_PULL_UP;
+    cfg.speed = GPIO_SPEED_LOW;
+    io_handle_init(&app_data->user_button_1, B1_GPIO_Port, B1_Pin, &cfg);
     button_init(&app_data->user_button_1, 5U);
+
+    /* Initialize BMP388 */
+    cfg.dir = GPIO_ALTERNATE;
+    cfg.otype = GPIO_PUSHPULL;
+    cfg.pull = GPIO_PULL_UP;
+    cfg.speed = GPIO_SPEED_HIGH;
+    cfg.func = LL_GPIO_AF_6;
+    io_handle_init(&app_data->i2c_scl, GPIOA, 9, &cfg);
+    io_handle_init(&app_data->i2c_sda, GPIOA, 10, &cfg);
+    i2c_handle_init(&app_data->bmp388_i2c, I2C1, &app_data->i2c_scl, &app_data->i2c_sda);
+    bmp388_init(&app_data->bmp388_dev, &app_data->bmp388_i2c, BMP388_SLAVE_ADDR);
 
     /* Initialize deadlines */
     app_data->baro_dl = deadline_make(0);
