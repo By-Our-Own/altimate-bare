@@ -1,0 +1,56 @@
+name: CI
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  test:
+    name: Test the Firmware
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code into workspace directory
+        uses: actions/checkout@v2
+
+      - name: Create and Run the tests
+        run: make -f tests.Makefile
+
+  install-deps-build-fw:
+    name: Install Dependencies & Build Firmware
+    runs-on: ubuntu-latest
+    steps:
+      - name: Cache deps
+        uses: actions/cache@v2
+        env:
+          cache-name: cache-deps
+        with:
+          path: ~/.deps
+          key: ${{ runner.os }}-${{ env.cache-name }}
+
+      - name: Install GNU Arm Embedded Toolchain
+        env:
+          GCC_ARM_NAME: gcc-arm-none-eabi-9-2020-q2-update
+        shell: bash
+        run: |
+          wget -q https://developer.arm.com/-/media/Files/downloads/gnu-rm/9-2020q2/$GCC_ARM_NAME-x86_64-linux.tar.bz2
+          tar xf $GCC_ARM_NAME-x86_64-linux.tar.bz2
+          rm -f $GCC_ARM_NAME-x86_64-linux.tar.bz2
+          mv $GCC_ARM_NAME /opt/${GCC_ARM_NAME}
+
+      - name: Checkout code into workspace directory
+        uses: actions/checkout@v2
+
+      - name: Checkout submodules
+        shell: bash
+        run: |
+          git config --global url."https://github.com/".insteadOf "git@github.com:"
+          auth_header="$(git config --local --get http.https://github.com/.extraheader)"
+          git submodule sync --recursive
+          git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
+
+      - name: Build the firmware
+        env:
+          TOOLCHAIN_PATH: /opt/gcc-arm-none-eabi-9-2020-q2-update/bin
+        run: make GCC_PATH=$TOOLCHAIN_PATH
