@@ -1,0 +1,75 @@
+# Project
+PRJ_DIR			= .
+BUILD_DIR		= $(PRJ_DIR)/build
+TEST_BUILD_DIR	= $(BUILD_DIR)/test
+
+# Toolchain
+CC = gcc
+
+CFLAGS	= -Wall
+CFLAGS += -Wextra
+CFLAGS += -Wpointer-arith
+CFLAGS += -Wcast-align
+CFLAGS += -Wwrite-strings
+CFLAGS += -Wswitch-default
+CFLAGS += -Wunreachable-code
+CFLAGS += -Winit-self
+CFLAGS += -Wmissing-field-initializers
+CFLAGS += -Wno-unknown-pragmas
+CFLAGS += -Wstrict-prototypes
+CFLAGS += -Wundef
+CFLAGS += -Wold-style-definition
+
+# CMOCK-UNITY specifics
+CMOCK_DIR			= $(PRJ_DIR)/Tests/CMock
+UNITY_DIR			= $(CMOCK_DIR)/vendor/unity
+CMOCK_CONFIG		= $(TEST_BUILD_DIR)/mock_cfg.yml
+GENERATED_MOCK_DIR 	= $(TEST_BUILD_DIR)/mocks
+CMOCK_UNITY_INC		= -I$(CMOCK_DIR)/src -I$(UNITY_DIR)/src -I$(GENERATED_MOCK_DIR)
+CMOCK_UNITY_SRC 	= $(CMOCK_DIR)/src/cmock.c $(UNITY_DIR)/src/unity.c
+HEADERS_TO_MOCK 	= $(PRJ_DIR)/Misc/Inc/delay.h
+
+# Test specifics
+TESTS_DIR	= $(PRJ_DIR)/Tests
+TESTS_INC	= -I$(PRJ_DIR)/Misc/Inc \
+			  -I$(PRJ_DIR)/Scheduler/Inc
+
+TEST_NAMES	= test_utils_itoa \
+			  test_utils_fptoa \
+			  test_deadline
+TESTS 		= $(patsubst %, $(TEST_BUILD_DIR)/%.out, $(TEST_NAMES))
+
+.PHONY: all setup folder create_mocks build_tests run_tests clean
+all: setup run_tests
+
+setup: folder create_mocks build_tests
+
+folder:
+	mkdir -p $(BUILD_DIR)
+	mkdir -p $(TEST_BUILD_DIR)
+
+create_mocks:
+	echo ":cmock:" > $(CMOCK_CONFIG)
+	echo "  :mock_prefix: \"mock_\"" >> $(CMOCK_CONFIG)
+	echo "  :treat_inlines: :include" >> $(CMOCK_CONFIG)
+	echo "  :mock_path: \"$(GENERATED_MOCK_DIR)\"" >> $(CMOCK_CONFIG)
+	ruby ${CMOCK_DIR}/lib/cmock.rb -o$(CMOCK_CONFIG) $(HEADERS_TO_MOCK)
+
+build_tests: $(TESTS)
+
+# Building tests
+$(TEST_BUILD_DIR)/%.out:
+	$(CC) $(CFLAGS) $(CMOCK_UNITY_INC) $(TESTS_INC) $^ -o $@
+
+# Tests dependencies
+$(TEST_BUILD_DIR)/test_utils_itoa.out: $(CMOCK_UNITY_SRC) ./Misc/Src/utils.c $(TESTS_DIR)/Misc/test_utils_itoa.c
+$(TEST_BUILD_DIR)/test_utils_fptoa.out: $(CMOCK_UNITY_SRC) ./Misc/Src/utils.c $(TESTS_DIR)/Misc/test_utils_fptoa.c
+$(TEST_BUILD_DIR)/test_deadline.out: $(CMOCK_UNITY_SRC) $(TESTS_DIR)/Scheduler/test_deadline.c $(GENERATED_MOCK_DIR)/mock_delay.c
+
+run_tests: $(TESTS)
+	- $(TEST_BUILD_DIR)/test_utils_itoa.out
+	- $(TEST_BUILD_DIR)/test_utils_fptoa.out
+	- $(TEST_BUILD_DIR)/test_deadline.out
+
+clean:
+	rm -rf ${BUILD_DIR}

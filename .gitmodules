@@ -4,3 +4,6 @@
 [submodule "Tests/Unity"]
 	path = Tests/Unity
 	url = https://github.com/ThrowTheSwitch/Unity.git
+[submodule "Tests/CMock"]
+	path = Tests/CMock
+	url = https://github.com/ThrowTheSwitch/CMock.git
