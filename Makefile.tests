@@ -39,10 +39,12 @@ TEST_NAMES	= test_utils_itoa \
 			  test_deadline
 TESTS 		= $(patsubst %, $(TEST_BUILD_DIR)/%.out, $(TEST_NAMES))
 
-.PHONY: all setup folder create_mocks build_tests run_tests clean
-all: setup run_tests
+TEST_RUNNER	= $(TEST_BUILD_DIR)/test_runner.sh
 
-setup: folder create_mocks build_tests
+.PHONY: all setup folder create_mocks build_tests run_tests clean
+all: setup
+
+setup: folder create_mocks build_tests $(TEST_RUNNER)
 
 folder:
 	mkdir -p $(BUILD_DIR)
@@ -66,10 +68,18 @@ $(TEST_BUILD_DIR)/test_utils_itoa.out: $(CMOCK_UNITY_SRC) ./Misc/Src/utils.c $(T
 $(TEST_BUILD_DIR)/test_utils_fptoa.out: $(CMOCK_UNITY_SRC) ./Misc/Src/utils.c $(TESTS_DIR)/Misc/test_utils_fptoa.c
 $(TEST_BUILD_DIR)/test_deadline.out: $(CMOCK_UNITY_SRC) $(TESTS_DIR)/Scheduler/test_deadline.c $(GENERATED_MOCK_DIR)/mock_delay.c
 
-run_tests: $(TESTS)
-	- $(TEST_BUILD_DIR)/test_utils_itoa.out
-	- $(TEST_BUILD_DIR)/test_utils_fptoa.out
-	- $(TEST_BUILD_DIR)/test_deadline.out
+$(TEST_RUNNER): $(TESTS)
+	echo "#!/bin/bash" > $(TEST_RUNNER); \
+	for i in $(TESTS); do \
+		echo "$$i | tee -a $(TEST_BUILD_DIR)/test_results.txt" >> $(TEST_RUNNER); \
+	done; \
+	echo 'failures=$$(cat $(TEST_BUILD_DIR)/test_results.txt | grep "^FAIL$$" | wc -l)' >> $(TEST_RUNNER); \
+	echo 'rm $(TEST_BUILD_DIR)/test_results.txt' >> $(TEST_RUNNER); \
+	echo 'exit $$failures' >> $(TEST_RUNNER)
+
+
+run_tests: $(TEST_RUNNER)
+	- bash $(TEST_RUNNER)
 
 clean:
 	rm -rf ${BUILD_DIR}
