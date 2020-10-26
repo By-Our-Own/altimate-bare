@@ -7,6 +7,41 @@ on:
     branches: [ master ]
 
 jobs:
+  code-quality:
+    name: Analyze code quality
+    runs-on: ubuntu-latest
+    env:
+      UNCRUSTIFY_VERSION: "0.71.0"
+      UNCRUSTIFY_PATH: "/home/runner/uncrustify"
+    steps:
+      - name: Cache Uncrustify
+        uses: actions/cache@v2
+        id: cache-uncrustify
+        with:
+          path: ${{ env.UNCRUSTIFY_PATH }}
+          key: ${{ runner.os }}-uncrustify-${{ env.UNCRUSTIFY_VERSION }}
+
+      - name: Install Uncrustify
+        env:
+          UNCRUSTIFY_URL: "https://github.com/uncrustify/uncrustify/archive/uncrustify-${{ env.UNCRUSTIFY_VERSION }}.tar.gz"
+        if: steps.cache-uncrustify.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL "$UNCRUSTIFY_URL" -o - | tar xz --one-top-level=uncrustify --strip-components=1
+          cd uncrustify
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build .
+          cmake --install . --prefix ${{ env.UNCRUSTIFY_PATH }}
+
+      - name: Add Uncrustify to PATH
+        run: echo "${{ env.UNCRUSTIFY_PATH }}/bin" >> $GITHUB_PATH
+
+      - name: Checkout current repo into workspace directory
+        uses: actions/checkout@v2
+
+      - name: Check code format
+        run: bash ./scripts/check_code_format.sh
+
   test:
     name: Test the Firmware
     runs-on: ubuntu-latest
@@ -50,7 +85,6 @@ jobs:
       GCC_ARM_VERSION: "gcc-arm-none-eabi-9-2020-q2-update"
       GCC_ARM_PATH: "/home/runner/gcc-arm-none-eabi-9-2020-q2-update"
     steps:
-
       - name: Checkout current repo into workspace directory
         uses: actions/checkout@v2
         with:
