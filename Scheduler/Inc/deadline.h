@@ -14,7 +14,7 @@
  */
 static inline uint8_t deadline_reached(uint16_t dl)
 {
-    return ((int16_t)(millis() - dl)) >= 0 ? 1 : 0;
+	return ((int16_t)(millis() - dl)) >= 0 ? 1 : 0;
 }
 
 /**
@@ -26,9 +26,8 @@ static inline uint8_t deadline_reached(uint16_t dl)
  */
 static inline uint16_t deadline_make(uint16_t t)
 {
-    return millis() + t;
+	return millis() + t;
 }
-
 
 /**
  * @brief Extend a current deadline
@@ -40,7 +39,7 @@ static inline uint16_t deadline_make(uint16_t t)
  */
 static inline uint16_t deadline_extend(uint16_t dl, uint16_t t)
 {
-    return dl + t;
+	return dl + t;
 }
 
 #endif /* _SCHEDULER_DEADLINE_H */
