@@ -7,50 +7,107 @@ on:
     branches: [ master ]
 
 jobs:
+  code-quality:
+    name: Analyze code quality
+    runs-on: ubuntu-latest
+    env:
+      UNCRUSTIFY_VERSION: "0.71.0"
+      UNCRUSTIFY_PATH: "/home/runner/uncrustify"
+    steps:
+      - name: Cache Uncrustify
+        uses: actions/cache@v2
+        id: cache-uncrustify
+        with:
+          path: ${{ env.UNCRUSTIFY_PATH }}
+          key: ${{ runner.os }}-uncrustify-${{ env.UNCRUSTIFY_VERSION }}
+
+      - name: Install Uncrustify
+        env:
+          UNCRUSTIFY_URL: "https://github.com/uncrustify/uncrustify/archive/uncrustify-${{ env.UNCRUSTIFY_VERSION }}.tar.gz"
+        if: steps.cache-uncrustify.outputs.cache-hit != 'true'
+        run: |
+          curl -sSL "$UNCRUSTIFY_URL" -o - | tar xz --one-top-level=uncrustify --strip-components=1
+          cd uncrustify
+          mkdir build && cd build
+          cmake -DCMAKE_BUILD_TYPE=Release ..
+          cmake --build .
+          cmake --install . --prefix ${{ env.UNCRUSTIFY_PATH }}
+
+      - name: Add Uncrustify to PATH
+        run: echo "${{ env.UNCRUSTIFY_PATH }}/bin" >> $GITHUB_PATH
+
+      - name: Checkout current repo into workspace directory
+        uses: actions/checkout@v2
+
+      - name: Check code format
+        run: bash ./scripts/check_code_format.sh
+
   test:
     name: Test the Firmware
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code into workspace directory
+      - name: Checkout current repo into workspace directory
         uses: actions/checkout@v2
+        with:
+          submodules: recursive
+
+      - name: Cache Ruby - Bundler
+        id: cache-ruby
+        uses: actions/cache@v2
+        with:
+          path: vendor/bundle
+          key: ${{ runner.os }}-gems-${{ hashFiles('**/Gemfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-gems-
+
+      - name: Install Ruby
+        uses: actions/setup-ruby@v1
+        with:
+          ruby-version: '2.6'
+
+      - name: Install CMock
+        run: |
+          cd Tests/CMock
+          bundle config path vendor/bundle
+          bundle install --jobs 4 --retry 3
+        if: steps.cache-ruby.outputs.cache-hit != 'true'
 
       - name: Create and Run the tests
-        run: make -f tests.Makefile
+        run: |
+          make -f Makefile.tests clean PRJ_DIR=${{ github.workspace }}
+          make -f Makefile.tests PRJ_DIR=${{ github.workspace }}
+          bash ${{ github.workspace }}/build/test/test_runner.sh
 
-  install-deps-build-fw:
-    name: Install Dependencies & Build Firmware
+  build:
+    name: Build Firmware
     runs-on: ubuntu-latest
+    env:
+      GCC_ARM_VERSION: "gcc-arm-none-eabi-9-2020-q2-update"
+      GCC_ARM_PATH: "/home/runner/gcc-arm-none-eabi-9-2020-q2-update"
     steps:
-      - name: Cache deps
-        uses: actions/cache@v2
-        env:
-          cache-name: cache-deps
+      - name: Checkout current repo into workspace directory
+        uses: actions/checkout@v2
         with:
-          path: ~/.deps
-          key: ${{ runner.os }}-${{ env.cache-name }}
+          submodules: true
+
+      - name: Cache GNU Arm Embedded Toolchain
+        id: cache-gcc-arm
+        uses: actions/cache@v2
+        with:
+          path: ${{ env.GCC_ARM_PATH }}
+          key: ${{ runner.os }}-gcc-arm-${{ env.GCC_ARM_VERSION }}
 
       - name: Install GNU Arm Embedded Toolchain
-        env:
-          GCC_ARM_NAME: gcc-arm-none-eabi-9-2020-q2-update
         shell: bash
         run: |
-          wget -q https://developer.arm.com/-/media/Files/downloads/gnu-rm/9-2020q2/$GCC_ARM_NAME-x86_64-linux.tar.bz2
-          tar xf $GCC_ARM_NAME-x86_64-linux.tar.bz2
-          rm -f $GCC_ARM_NAME-x86_64-linux.tar.bz2
-          mv $GCC_ARM_NAME /opt/${GCC_ARM_NAME}
+          wget -q https://developer.arm.com/-/media/Files/downloads/gnu-rm/9-2020q2/${{ env.GCC_ARM_VERSION }}-x86_64-linux.tar.bz2
+          tar xf ${{ env.GCC_ARM_VERSION }}-x86_64-linux.tar.bz2
+          rm -f ${{ env.GCC_ARM_VERSION }}-x86_64-linux.tar.bz2
+          mv ${{ env.GCC_ARM_VERSION }} ${{ env.GCC_ARM_PATH }}
+        if: steps.cache-gcc-arm.outputs.cache-hit != 'true'
 
-      - name: Checkout code into workspace directory
-        uses: actions/checkout@v2
-
-      - name: Checkout submodules
-        shell: bash
-        run: |
-          git config --global url."https://github.com/".insteadOf "git@github.com:"
-          auth_header="$(git config --local --get http.https://github.com/.extraheader)"
-          git submodule sync --recursive
-          git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
+      - name: Add GNU Arm Embedded Toolchain to PATH
+        run: echo "${{ env.GCC_ARM_PATH }}/bin" >> $GITHUB_PATH
 
       - name: Build the firmware
-        env:
-          TOOLCHAIN_PATH: /opt/gcc-arm-none-eabi-9-2020-q2-update/bin
-        run: make GCC_PATH=$TOOLCHAIN_PATH
+        run: make
